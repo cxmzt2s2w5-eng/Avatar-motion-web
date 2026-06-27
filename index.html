@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Avatar Motion Web</title>
+    <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+    <main class="app">
+        <section class="hero">
+            <p class="eyebrow">Real-time Web Motion Capture</p>
+            <h1>Avatar Motion Web</h1>
+        </section>
+
+        <section class="controls">
+            <button id="start-button" class="primary-button">
+                Запустить камеру
+            </button>
+
+            <button id="stop-button" class="secondary-button" disabled>
+                Выключить камеру
+            </button>
+
+            <div class="avatar-picker" aria-label="Выбор персонажа">
+                <button class="avatar-button active" data-avatar="0">Avatar 1</button>
+                <button class="avatar-button" data-avatar="1">Avatar 2</button>
+            </div>
+        </section>
+
+        <p id="status" class="status">Выбери персонажа и запусти камеру</p>
+
+        <section class="workspace">
+            <article class="panel">
+                <div class="panel-header">
+                    <h2>Camera</h2>
+                    <span id="tracking-status">Pose tracking: off</span>
+                </div>
+
+                <div class="camera-container">
+                    <video id="camera" autoplay playsinline muted></video>
+                    <canvas id="pose-canvas"></canvas>
+                </div>
+            </article>
+
+            <article class="panel">
+                <div class="panel-header">
+                    <h2>3D Avatar</h2>
+                    <span id="avatar-name">Avatar 1</span>
+                </div>
+
+                <div class="avatar-container">
+                    <canvas id="avatar-canvas"></canvas>
+                </div>
+            </article>
+        </section>
+    </main>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.166.1/examples/jsm/"
+            }
+        }
+    </script>
+    <script type="module" src="./main.js"></script>
+</body>
+</html>
