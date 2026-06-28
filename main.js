@@ -20,18 +20,12 @@ let activeAvatarIndex = 0;
 let currentModel = null;
 let currentRig = null;
 
-// --- Framing / retarget config ---------------------------------------------
-// Every avatar is normalized to this world height and centered on BASE_Y,
-// so the baked-in scale/offset inside each GLB no longer matters.
 const TARGET_HEIGHT = 3.0;
-const BASE_Y = 1.1; // совпадает с camera.lookAt — модель в центре кадра
+const BASE_Y = 1.1;
 
-// ЕДИНЫЙ переключатель горизонтали для ВСЕГО (руки, корпус, голова).
-// Если лево/право перепутаны (сводишь руки — они разводятся) — поменяй MIRROR_X на -1.
-// Этого одного флага достаточно: все горизонтальные оси согласованы между собой.
 const MIRROR_X = 1;
-const ARM_SWAP = false;   // запасной флаг: меняет какую руку аватара ведёт какая рука пользователя
-const DEPTH_WEIGHT = 0.6; // вклад глубины MediaPipe (шумная, держим небольшой)
+const ARM_SWAP = false;
+const DEPTH_WEIGHT = 0.6;
 
 const avatars = [
     {
@@ -79,7 +73,7 @@ const floor = new THREE.Mesh(
     })
 );
 floor.rotation.x = -Math.PI / 2;
-floor.position.y = BASE_Y - TARGET_HEIGHT / 2 - 0.02; // под ногами нормализованной модели
+floor.position.y = BASE_Y - TARGET_HEIGHT / 2 - 0.02;
 scene.add(floor);
 
 const ambientLight = new THREE.HemisphereLight(0xffffff, 0x172033, 2.7);
@@ -135,7 +129,6 @@ async function loadAvatar(index) {
         currentRig = null;
     }
 
-    // сбрасываем трансформ, чтобы центрирование модели было точным
     avatarRoot.rotation.set(0, 0, 0);
     avatarRoot.position.copy(basePosition);
 
@@ -147,7 +140,7 @@ async function loadAvatar(index) {
             currentModel.traverse(function (object) {
                 if (object.isMesh) {
                     object.castShadow = true;
-                    object.frustumCulled = false; // скиннинг + увеличенный bbox => не отсекать
+                    object.frustumCulled = false;
 
                     if (object.material) {
                         const materials = Array.isArray(object.material) ? object.material : [object.material];
@@ -155,10 +148,6 @@ async function loadAvatar(index) {
                         materials.forEach(function (material) {
                             material.side = THREE.DoubleSide;
 
-                            // Запечённая metallicRoughness-текстура делает персонажа
-                            // глянцевым и тёмным (глянец отражает тёмный фон). Игнорируем
-                            // её и ставим равномерный матовый материал. Albedo и normal-карта
-                            // остаются — детали поверхности сохраняются.
                             material.metalness = 0;
                             material.roughness = 0.78;
                             material.metalnessMap = null;
@@ -358,8 +347,6 @@ function animate() {
     renderer.render(scene, camera);
 }
 
-// Естественная расслабленная поза в МИРОВОМ пространстве (для idle / когда часть руки не видна).
-// Плечо: вниз и чуть вперёд; предплечье: вниз-вперёд (лёгкий сгиб в локте) — как у стоящего человека.
 const RELAXED_UPPER_LEFT = new THREE.Vector3(-0.15, -1, 0.12);
 const RELAXED_UPPER_RIGHT = new THREE.Vector3(0.15, -1, 0.12);
 const RELAXED_FORE_LEFT = new THREE.Vector3(-0.08, -0.9, 0.35);
@@ -371,7 +358,7 @@ function updateAvatarMotion() {
     }
 
     if (!latestPose) {
-        // Лёгкое вращение + руки опущены, пока нет трекинга
+
         avatarRoot.rotation.y += 0.0015;
         avatarRoot.position.lerp(basePosition, 0.05);
         relaxArms(0.1);
@@ -424,8 +411,7 @@ function updateAvatarMotion() {
     }
 
     if (isVisible(nose)) {
-        // Поворот головы считаем ОТНОСИТЕЛЬНО центра плеч (а не центра кадра),
-        // иначе сигнал слишком слабый и голова почти не крутится.
+
         const headYaw = clamp((nose.x - shoulderCenterX) * MIRROR_X * 3.2, -0.75, 0.75);
         const headPitch = clamp((0.4 - nose.y) * 1.2, -0.5, 0.5);
 
@@ -433,8 +419,6 @@ function updateAvatarMotion() {
         rotateBone(currentRig.head, { y: headYaw * 0.55, x: headPitch * 0.55 }, 0.18);
     }
 
-    // Руки: каждый сегмент управляется отдельно. Если предплечье/запястье не видно —
-    // рука не дёргается назад, а свисает в естественную расслабленную позу.
     const left = { sh: leftShoulder, el: leftElbow, wr: leftWrist };
     const right = { sh: rightShoulder, el: rightElbow, wr: rightWrist };
     const driveLeftBone = ARM_SWAP ? right : left;
@@ -454,7 +438,7 @@ function driveArm(upper, fore, hand, lm, relaxUpper, relaxFore, amount) {
     if (isVisible(lm.el) && isVisible(lm.wr)) {
         aimBone(fore, hand, limbDir(lm.el, lm.wr), amount);
     } else {
-        // предплечье свисает вниз-вперёд от текущего положения локтя
+
         aimBone(fore, hand, relaxFore, 0.12);
     }
 }
@@ -466,9 +450,6 @@ function relaxArms(amount) {
     aimBone(currentRig.rightForeArm, currentRig.rightHand, RELAXED_FORE_RIGHT, amount);
 }
 
-// Направление сегмента кости в МИРОВОМ пространстве из двух MediaPipe-ландмарок.
-// Та же горизонтальная конвенция, что и у корпуса/головы (управляется MIRROR_X),
-// чтобы всё зеркалилось согласованно. y экрана (вниз) -> -Y, глубина -> +Z (к камере).
 const _limbDir = new THREE.Vector3();
 function limbDir(a, b) {
     return _limbDir.set(
@@ -478,8 +459,6 @@ function limbDir(a, b) {
     );
 }
 
-// Наводит кость так, чтобы её сегмент (bone -> child) смотрел вдоль worldDir.
-// Работает для любого рига: rest-направление берётся из реального смещения дочерней кости.
 const _parentQuat = new THREE.Quaternion();
 const _restDir = new THREE.Vector3();
 const _localDir = new THREE.Vector3();
@@ -489,14 +468,12 @@ function aimBone(bone, child, worldDir, amount) {
         return;
     }
 
-    // rest-направление кости в её локальной системе = направление на дочернюю кость
     _restDir.copy(child.position);
     if (_restDir.lengthSq() < 1e-9) {
         return;
     }
     _restDir.normalize();
 
-    // желаемое направление, переведённое в систему родителя кости
     bone.parent.getWorldQuaternion(_parentQuat);
     _localDir.copy(worldDir).applyQuaternion(_parentQuat.invert()).normalize();
 
@@ -504,8 +481,6 @@ function aimBone(bone, child, worldDir, amount) {
     bone.quaternion.slerp(_targetQuat, amount);
 }
 
-// Нормализует модель независимо от зашитого в GLB масштаба/смещения:
-// масштабирует к единой высоте TARGET_HEIGHT и центрирует на origin avatarRoot.
 function fitModel(model, rotationY) {
     model.position.set(0, 0, 0);
     model.scale.setScalar(1);
@@ -522,7 +497,6 @@ function fitModel(model, rotationY) {
     const box2 = new THREE.Box3().setFromObject(model);
     const center = box2.getCenter(new THREE.Vector3());
 
-    // сдвигаем так, чтобы центр модели совпал с мировым положением avatarRoot
     model.position.x -= center.x - avatarRoot.position.x;
     model.position.y -= center.y - avatarRoot.position.y;
     model.position.z -= center.z - avatarRoot.position.z;
